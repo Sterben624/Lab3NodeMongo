@@ -1,5 +1,6 @@
 const express = require("express");
 const { MongoClient, ObjectID } = require("mongodb");
+const path = require("path");
 
 const app = express();
 const jsonParser = express.json();
@@ -19,6 +20,14 @@ async function startServer() {
         const collection = db.collection(collectionName);
         app.locals.collection = collection;
 
+        // Налаштовуємо Express на обробку статичних файлів із кореневої папки проекту
+        app.use(express.static(__dirname));
+
+        // Встановлюємо обробник для кореневого маршруту, який віддаватиме вашу основну сторінку
+        app.get("/", (req, res) => {
+            res.sendFile(path.join(__dirname, "public.html"));
+        });
+
         app.listen(3000, () => {
             console.log("Server is listening on port 3000");
         });
@@ -29,8 +38,7 @@ async function startServer() {
 
 startServer();
 
-app.use(express.static(__dirname + "/public"));
-
+// Інші обробники маршрутів залишаються незмінними
 app.get("/api/users", async (req, res) => {
     try {
         const collection = req.app.locals.collection;
@@ -110,7 +118,7 @@ app.put("/api/users", jsonParser, async (req, res) => {
     }
 });
 
-// Handle Ctrl+C event to close MongoDB connection
+// Обробка виходу з програми для закриття з'єднання з MongoDB
 process.on("SIGINT", async () => {
     try {
         await client.close();
