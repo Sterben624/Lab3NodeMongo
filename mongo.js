@@ -1,147 +1,153 @@
 const express = require("express");
-const { MongoClient} = require("mongodb");
-const { ObjectId } = require('mongodb');
+const { MongoClient, ObjectId } = require("mongodb"); // Додаємо ObjectId для роботи з ідентифікаторами MongoDB
 const path = require("path");
 
 const app = express();
 const jsonParser = express.json();
 
 const url = "mongodb://localhost:27017/";
-const dbName = "usersdb";
-const collectionName = "users";
+const dbName = "carsdb";
+const collectionName = "cars";
 
 let client;
+
+app.use(express.static(path.join(__dirname), {
+    setHeaders: (res, path, stat) => {
+        if (path.endsWith(".css")) {
+            res.setHeader("Content-Type", "text/css");
+        }
+    }
+}));
 
 async function startServer() {
     client = new MongoClient(url);
 
     try {
         await client.connect();
-        console.log("Connected to MongoDB");
+        console.log("Підключено до MongoDB");
 
         const db = client.db(dbName);
         const collection = db.collection(collectionName);
         app.locals.collection = collection;
 
-        app.use(express.static(path.join(__dirname, "public")));
+        app.use(express.static(path.join(__dirname)));
 
         app.get("/", (req, res) => {
             res.sendFile(path.join(__dirname, "public.html"));
         });
 
-        app.get("/users", getUsers);
-        app.get("/users/:id", getUserById);
-        app.post("/users", jsonParser, createUser);
-        app.delete("/users/:id", deleteUser);
-        app.put("/users/:id", jsonParser, updateUser);
+        app.get("/cars", getCars);
+        app.get("/cars/:id", getCarById);
+        app.post("/cars", jsonParser, createCar);
+        app.delete("/cars/:id", deleteCar);
+        app.put("/cars/:id", jsonParser, updateCar);
 
         app.listen(3000, () => {
-            console.log("Server is listening on port 3000");
+            console.log("Сервер слухає порт 3000");
         });
     } catch (err) {
-        console.error("Error connecting to MongoDB", err);
+        console.error("Помилка підключення до MongoDB", err);
         process.exit(1);
     }
 }
 
-async function getUsers(req, res) {
+async function getCars(req, res) {
     try {
         const collection = req.app.locals.collection;
-        const users = await collection.find({}).toArray();
-        res.send(users);
+        const cars = await collection.find({}).toArray();
+        res.send(cars);
     } catch (err) {
-        console.error("Error fetching users", err);
-        res.status(500).send("Error fetching users");
+        console.error("Помилка отримання списку автомобілів", err);
+        res.status(500).send("Помилка отримання списку автомобілів");
     }
 }
 
-async function getUserById(req, res) {
+async function getCarById(req, res) {
     try {
         const id = new ObjectId(req.params.id);
         const collection = req.app.locals.collection;
-        const user = await collection.findOne({ _id: id });
-        if (!user) {
-            return res.status(404).send('Пользователь не найден');
+        const car = await collection.findOne({ _id: id });
+        if (!car) {
+            return res.status(404).send('Автомобіль не знайдено');
         }
-        res.send(user);
+        res.send(car);
     } catch (err) {
-        console.error('Ошибка при получении пользователя по ID', err);
-        res.status(500).send('Ошибка при получении пользователя по ID');
+        console.error('Помилка при отриманні автомобіля за ID', err);
+        res.status(500).send('Помилка при отриманні автомобіля за ID');
     }
 }
 
-async function createUser(req, res) {
+async function createCar(req, res) {
     try {
-        const { name, age } = req.body;
-        const user = { name, age };
+        const { make, model, year } = req.body;
+        const car = { make, model, year };
 
         const collection = req.app.locals.collection;
-        await collection.insertOne(user);
+        await collection.insertOne(car);
 
-        res.send(user);
+        res.send(car);
     } catch (err) {
-        console.error("Error inserting user", err);
-        res.status(500).send("Error inserting user");
+        console.error("Помилка при додаванні автомобіля", err);
+        res.status(500).send("Помилка при додаванні автомобіля");
     }
 }
 
-
-async function deleteUser(req, res) {
+async function deleteCar(req, res) {
     try {
         const id = new ObjectId(req.params.id);
         const collection = req.app.locals.collection;
         const result = await collection.deleteOne({ _id: id });
 
         if (result.deletedCount === 0) {
-            return res.status(404).send('Пользователь не найден');
+            return res.status(404).send('Автомобіль не знайдено');
         }
-        res.send({ message: 'Пользователь успешно удалён' });
+        res.send({ message: 'Автомобіль успішно видалено' });
     } catch (err) {
-        console.error('Ошибка при удалении пользователя', err);
-        res.status(500).send('Ошибка при удалении пользователя');
+        console.error('Помилка при видаленні автомобіля', err);
+        res.status(500).send('Помилка при видаленні автомобіля');
     }
 }
 
-async function updateUser(req, res) {
+async function updateCar(req, res) {
     try {
-        const { id, name, age } = req.body;
+        const { make, model, year } = req.body;
         const objectId = new ObjectId(req.params.id);
 
-        console.log("Updating user with ID:", req.params.id); // Отладочный вывод
-        console.log("Updating with name:", name, "and age:", age); // Отладочный вывод
+        console.log("Оновлення автомобіля за ID:", req.params.id);
+        console.log("Оновлення з маркою:", make, "моделлю:", model, "і роком:", year);
 
         const collection = req.app.locals.collection;
         const result = await collection.findOneAndUpdate(
             { _id: objectId },
-            { $set: { name, age } },
+            { $set: { make, model, year } },
             { returnOriginal: false }
         );
 
         if (!result) {
-            return res.status(404).send("User not found");
+            return res.status(404).send("Автомобіль не знайдено");
         }
 
-        // Создаем объект JSON с полями name и age для передачи в res.json()
-        const updatedUser = {
-            id: id,
-            name: name,
-            age: age
+        const updatedCar = {
+            id: req.params.id,
+            make: make,
+            model: model,
+            year: year
         };
-        console.log("updatedUser: ", updatedUser); // Отладочный вывод
-        res.json(updatedUser); // Возвращаем обновленного пользователя в формате JSON
+        console.log("updatedCar: ", updatedCar);
+        res.json(updatedCar);
     } catch (err) {
-        console.error("Error updating user", err);
-        res.status(500).send("Error updating user");
+        console.error("Помилка при оновленні автомобіля", err);
+        res.status(500).send("Помилка при оновленні автомобіля");
     }
 }
 
 process.on("SIGINT", async () => {
     try {
         await client.close();
-        console.log("Disconnected from MongoDB");
+        console.log("Відключено від MongoDB");
         process.exit(0);
     } catch (err) {
-        console.error("Error closing MongoDB connection", err);
+        console.error("Помилка закриття з'єднання з MongoDB", err);
         process.exit(1);
     }
 });
